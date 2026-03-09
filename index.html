@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Visualizer</title>
+<style>
+:root, [data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f8fa;
+  --bg-input: #ffffff;
+  --bg-toolbar: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666;
+  --border: #e0e0e0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --error: #dc2626;
+  --error-bg: #fef2f2;
+  --success-bg: #f0fdf4;
+  --success: #16a34a;
+  --json-key: #881280;
+  --json-string: #1a7f37;
+  --json-number: #0550ae;
+  --json-bool: #cf222e;
+  --json-null: #6e7781;
+  --tree-line: #e0e0e0;
+  --btn-bg: #f3f4f6;
+  --btn-hover: #e5e7eb;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #181825;
+  --bg-input: #1e1e2e;
+  --bg-toolbar: #1e1e2e;
+  --text-primary: #cdd6f4;
+  --text-secondary: #a6adc8;
+  --border: #45475a;
+  --accent: #89b4fa;
+  --accent-hover: #74c7ec;
+  --error: #f38ba8;
+  --error-bg: #311e2a;
+  --success-bg: #1e3127;
+  --success: #a6e3a1;
+  --json-key: #cba6f7;
+  --json-string: #a6e3a1;
+  --json-number: #89b4fa;
+  --json-bool: #fab387;
+  --json-null: #6c7086;
+  --tree-line: #45475a;
+  --btn-bg: #313244;
+  --btn-hover: #45475a;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Toolbar */
+.toolbar {
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+.toolbar .logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 12px;
+  white-space: nowrap;
+}
+.toolbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.btn:hover { background: var(--btn-hover); }
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-smart {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+.btn-smart:hover { background: #059669; border-color: #059669; }
+.btn-quote {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+}
+.btn-quote:hover { background: #d97706; border-color: #d97706; }
+.btn-theme {
+  margin-left: auto;
+  font-size: 16px;
+  padding: 6px 10px;
+}
+/* Error bar */
+.error-bar {
+  background: var(--error-bg);
+  color: var(--error);
+  padding: 6px 16px;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-bottom: 1px solid var(--error);
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+.error-bar.visible { display: flex; }
+.toast {
+  position: fixed;
+  top: 60px;
+  right: 20px;
+  background: var(--success-bg);
+  color: var(--success);
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--success);
+  font-size: 14px;
+  z-index: 100;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+/* Panels */
+.panels {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+.panel:last-child { border-right: none; }
+.panel-header {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-header .tree-actions { display: flex; gap: 4px; }
+.panel-header .btn { padding: 3px 8px; font-size: 12px; }
+/* Editor */
+.editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.editor-wrapper textarea,
+.editor-wrapper pre {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: auto;
+  border: none;
+  outline: none;
+  resize: none;
+  margin: 0;
+  tab-size: 2;
+}
+.editor-wrapper pre {
+  background: var(--bg-input);
+  pointer-events: none;
+  z-index: 1;
+}
+.editor-wrapper textarea {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-primary);
+  z-index: 2;
+  -webkit-text-fill-color: transparent;
+}
+.editor-wrapper textarea::selection {
+  background: rgba(37, 99, 235, 0.2);
+  -webkit-text-fill-color: transparent;
+}
+.json-key { color: var(--json-key); }
+.json-string { color: var(--json-string); }
+.json-number { color: var(--json-number); }
+.json-bool { color: var(--json-bool); }
+.json-error-line {
+  background: var(--error-bg);
+  display: inline;
+  border-bottom: 2px wavy var(--error);
+}
+.json-error-char {
+  background: var(--error);
+  color: #fff;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.json-null { color: var(--json-null); }
+.json-brace { color: var(--text-secondary); }
+/* Status bar */
+.status-bar {
+  padding: 4px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+}
+/* Tree view */
+.tree-container {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  background: var(--bg-input);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.tree-node { padding-left: 20px; }
+.tree-node.root { padding-left: 0; }
+.tree-toggle {
+  display: inline-block;
+  width: 16px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary);
+  text-align: center;
+  transition: transform 0.15s;
+}
+.tree-toggle:hover { color: var(--accent); }
+.tree-toggle.collapsed { transform: rotate(-90deg); }
+.tree-key { color: var(--json-key); font-weight: 500; }
+.tree-colon { color: var(--text-secondary); }
+.tree-string { color: var(--json-string); }
+.tree-number { color: var(--json-number); }
+.tree-bool { color: var(--json-bool); }
+.tree-null { color: var(--json-null); font-style: italic; }
+.tree-bracket { color: var(--text-secondary); }
+.tree-size { color: var(--text-secondary); font-size: 11px; margin-left: 4px; opacity: 0.7; }
+.tree-children { }
+.tree-children.collapsed { display: none; }
+.tree-line {
+  display: flex;
+  align-items: flex-start;
+}
+.tree-empty {
+  color: var(--text-secondary);
+  padding: 40px;
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+}
+@media (max-width: 768px) {
+  .panels { grid-template-columns: 1fr; }
+  .panel { min-height: 40vh; border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<header class="toolbar">
+  <span class="logo">{ } JSON Visualizer</span>
+  <div class="toolbar-actions">
+    <button class="btn btn-primary" id="btn-format" title="Ctrl+Shift+F">格式化</button>
+    <button class="btn" id="btn-compress" title="Ctrl+Shift+M">压缩</button>
+    <button class="btn btn-smart" id="btn-smart" title="智能提取JSON + 修复Python风格(None/True/False) + 单引号转双引号">智能修复</button>
+    <button class="btn btn-quote" id="btn-quote" title="单引号转双引号">单引号 → 双引号</button>
+    <button class="btn" id="btn-unescape" title="去除转义符号 \" → &quot;">去转义</button>
+    <button class="btn" id="btn-escape" title="添加转义符号">加转义</button>
+    <button class="btn" id="btn-copy">复制</button>
+    <button class="btn" id="btn-clear">清空</button>
+  </div>
+  <button class="btn btn-theme" id="btn-theme" title="切换主题">🌙</button>
+</header>
+
+<div class="error-bar" id="error-bar">
+  <span>✕</span>
+  <span id="error-msg"></span>
+  <span id="error-pos" style="margin-left:auto;cursor:pointer;text-decoration:underline;white-space:nowrap;"></span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<main class="panels">
+  <section class="panel">
+    <div class="panel-header">
+      <span>输入 JSON</span>
+    </div>
+    <div class="editor-wrapper">
+      <pre id="highlight" aria-hidden="true"></pre>
+      <textarea id="input" spellcheck="false" placeholder='在此粘贴 JSON，支持单引号格式...\n例如：{"name": "test", "value": 123}'></textarea>
+    </div>
+    <div class="status-bar" id="status-bar">0 字节 | 0 行</div>
+  </section>
+  <section class="panel">
+    <div class="panel-header">
+      <span>树形视图</span>
+      <div class="tree-actions">
+        <button class="btn" id="btn-expand">全部展开</button>
+        <button class="btn" id="btn-collapse">全部折叠</button>
+      </div>
+    </div>
+    <div class="tree-container" id="tree-container">
+      <div class="tree-empty">在左侧输入 JSON 数据以可视化</div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function() {
+  const $ = id => document.getElementById(id);
+  const textarea = $('input');
+  const pre = $('highlight');
+  const treeContainer = $('tree-container');
+  const errorBar = $('error-bar');
+  const errorMsg = $('error-msg');
+  const statusBar = $('status-bar');
+  const toast = $('toast');
+
+  // Theme
+  const savedTheme = localStorage.getItem('json-viz-theme') || 'light';
+  document.documentElement.dataset.theme = savedTheme;
+  $('btn-theme').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+  $('btn-theme').addEventListener('click', () => {
+    const current = document.documentElement.dataset.theme;
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('json-viz-theme', next);
+    $('btn-theme').textContent = next === 'dark' ? '☀️' : '🌙';
+  });
+
+  // Debounce
+  function debounce(fn, ms) {
+    let t;
+    return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+  }
+
+  // HTML escape
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Syntax highlight JSON string, with optional error position marking
+  // errorPos is the character offset (0-based) where the error is, or -1 for no error
+  function highlightJSON(str, errorPos) {
+    if (errorPos >= 0) {
+      return highlightJSONWithError(str, errorPos);
+    }
+    // Fast path: no error, pure syntax highlight
+    const re = /("(?:[^"\\]|\\.)*")\s*(:)?|(\btrue\b|\bfalse\b)|(\bnull\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
+    let result = '';
+    let lastIndex = 0;
+    let match;
+    while ((match = re.exec(str)) !== null) {
+      if (match.index > lastIndex) {
+        result += esc(str.slice(lastIndex, match.index));
+      }
+      if (match[1] !== undefined) {
+        if (match[2]) {
+          result += '<span class="json-key">' + esc(match[1]) + '</span>' + match[2];
+        } else {
+          result += '<span class="json-string">' + esc(match[1]) + '</span>';
+        }
+      } else if (match[3] !== undefined) {
+        result += '<span class="json-bool">' + match[3] + '</span>';
+      } else if (match[4] !== undefined) {
+        result += '<span class="json-null">' + match[4] + '</span>';
+      } else if (match[5] !== undefined) {
+        result += '<span class="json-number">' + match[5] + '</span>';
+      }
+      lastIndex = re.lastIndex;
+    }
+    if (lastIndex < str.length) {
+      result += esc(str.slice(lastIndex));
+    }
+    return result;
+  }
+
+  // Highlight with error position: split the string into before-error, error-line, after-error
+  function highlightJSONWithError(str, errorPos) {
+    // Find the line containing the error
+    let lineStart = str.lastIndexOf('\n', errorPos - 1) + 1;
+    let lineEnd = str.indexOf('\n', errorPos);
+    if (lineEnd === -1) lineEnd = str.length;
+
+    const before = str.slice(0, lineStart);
+    const errorLine = str.slice(lineStart, lineEnd);
+    const after = str.slice(lineEnd);
+
+    // Highlight each part separately, wrap the error line
+    let result = '';
+    if (before) result += highlightJSON(before, -1);
+    // Highlight the error line content, then wrap it
+    const errorCol = errorPos - lineStart;
+    const lineBefore = errorLine.slice(0, errorCol);
+    const errorChar = errorLine.slice(errorCol, errorCol + 1);
+    const lineAfter = errorLine.slice(errorCol + 1);
+    result += '<span class="json-error-line">';
+    result += highlightJSON(lineBefore, -1);
+    result += '<span class="json-error-char">' + esc(errorChar) + '</span>';
+    result += highlightJSON(lineAfter, -1);
+    result += '</span>';
+    if (after) result += highlightJSON(after, -1);
+    return result;
+  }
+
+  // Large input threshold
+  const LARGE_THRESHOLD = 100000;
+
+  // Current error position for highlighting
+  let currentErrorPos = -1;
+
+  function updateHighlight() {
+    const val = textarea.value;
+    // Parse first to get error position
+    parseAndRender();
+    if (val.length > LARGE_THRESHOLD) {
+      pre.textContent = val;
+    } else {
+      pre.innerHTML = highlightJSON(val, currentErrorPos) + '\n';
+      // Scroll to the error marker if present
+      if (currentErrorPos >= 0) {
+        const marker = pre.querySelector('.json-error-line');
+        if (marker) {
+          // Ensure the error is visible in the editor
+          const rect = marker.getBoundingClientRect();
+          const preRect = pre.getBoundingClientRect();
+          if (rect.top < preRect.top || rect.bottom > preRect.bottom) {
+            marker.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            textarea.scrollTop = pre.scrollTop;
+          }
+        }
+      }
+    }
+    updateStatusBar();
+  }
+
+  // Scroll sync
+  textarea.addEventListener('scroll', () => {
+    pre.scrollTop = textarea.scrollTop;
+    pre.scrollLeft = textarea.scrollLeft;
+  });
+
+  textarea.addEventListener('input', debounce(updateHighlight, 100));
+
+  // Tab key support
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + 2;
+      updateHighlight();
+    }
+  });
+
+  const errorPos = $('error-pos');
+
+  function showError(msg, line, col) {
+    errorMsg.textContent = msg;
+    if (line !== undefined && line >= 0) {
+      errorPos.textContent = `第 ${line + 1} 行, 第 ${col + 1} 列 — 点击定位`;
+      errorPos.style.display = '';
+    } else {
+      errorPos.textContent = '';
+      errorPos.style.display = 'none';
+    }
+    errorBar.classList.add('visible');
+  }
+
+  function hideError() {
+    errorBar.classList.remove('visible');
+    currentErrorPos = -1;
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  }
+
+  function updateStatusBar() {
+    const val = textarea.value;
+    const bytes = new Blob([val]).size;
+    const lines = val ? val.split('\n').length : 0;
+    statusBar.textContent = `${bytes} 字节 | ${lines} 行`;
+  }
+
+  // Extract error position from JSON.parse error message
+  // Different engines format differently:
+  //   Chrome/V8: "... at position 42" or "... at line 3 column 5"
+  //   Firefox: "... at line 3 column 5"
+  //   Safari: "... at character 42"
+  function extractErrorPosition(errMsg, str) {
+    // Try "at position N"
+    let m = errMsg.match(/at position (\d+)/i);
+    if (m) return parseInt(m[1], 10);
+
+    // Try "at line L column C"
+    m = errMsg.match(/at line (\d+) column (\d+)/i);
+    if (m) {
+      const line = parseInt(m[1], 10) - 1;
+      const col = parseInt(m[2], 10) - 1;
+      return posFromLineCol(str, line, col);
+    }
+
+    // Try "at character N" (Safari)
+    m = errMsg.match(/at character (\d+)/i);
+    if (m) return parseInt(m[1], 10);
+
+    return -1;
+  }
+
+  function posFromLineCol(str, line, col) {
+    let l = 0, pos = 0;
+    while (pos < str.length && l < line) {
+      if (str[pos] === '\n') l++;
+      pos++;
+    }
+    return pos + col;
+  }
+
+  function lineColFromPos(str, pos) {
+    let line = 0, col = 0;
+    for (let i = 0; i < pos && i < str.length; i++) {
+      if (str[i] === '\n') { line++; col = 0; }
+      else col++;
+    }
+    return { line, col };
+  }
+
+  // Parse and render tree
+  function parseAndRender() {
+    const rawVal = textarea.value;
+    const val = rawVal.trim();
+    if (!val) {
+      hideError();
+      currentErrorPos = -1;
+      treeContainer.innerHTML = '<div class="tree-empty">在左侧输入 JSON 数据以可视化</div>';
+      return;
+    }
+    try {
+      const data = JSON.parse(val);
+      hideError();
+      currentErrorPos = -1;
+      renderTree(data);
+    } catch (e) {
+      // Find error position in the raw (untrimmed) value
+      // First try parsing rawVal to get position relative to it
+      let errPos = extractErrorPosition(e.message, rawVal);
+      if (errPos < 0) {
+        // Try parsing trimmed and adjust
+        errPos = extractErrorPosition(e.message, val);
+        if (errPos >= 0) {
+          // Offset by leading whitespace
+          const leadingWs = rawVal.length - rawVal.trimStart().length;
+          errPos += leadingWs;
+        }
+      }
+      currentErrorPos = errPos;
+      const { line, col } = errPos >= 0 ? lineColFromPos(rawVal, errPos) : { line: -1, col: -1 };
+      showError('JSON 解析错误: ' + e.message, line, col);
+      treeContainer.innerHTML = '<div class="tree-empty">JSON 格式有误，请检查</div>';
+    }
+  }
+
+  // Build tree
+  function renderTree(data) {
+    treeContainer.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    const node = buildNode(null, data, 0, false);
+    node.classList.add('root');
+    frag.appendChild(node);
+    treeContainer.appendChild(frag);
+  }
+
+  function buildNode(key, value, depth, isLast) {
+    const div = document.createElement('div');
+    div.className = 'tree-node';
+
+    if (value !== null && typeof value === 'object') {
+      const isArray = Array.isArray(value);
+      const entries = isArray ? value : Object.entries(value);
+      const len = isArray ? value.length : Object.keys(value).length;
+      const openBracket = isArray ? '[' : '{';
+      const closeBracket = isArray ? ']' : '}';
+
+      // Header line
+      const line = document.createElement('div');
+      line.className = 'tree-line';
+
+      const toggle = document.createElement('span');
+      toggle.className = 'tree-toggle';
+      toggle.textContent = '▼';
+      line.appendChild(toggle);
+
+      if (key !== null) {
+        const k = document.createElement('span');
+        k.className = 'tree-key';
+        k.textContent = '"' + key + '"';
+        line.appendChild(k);
+        const colon = document.createElement('span');
+        colon.className = 'tree-colon';
+        colon.textContent = ': ';
+        line.appendChild(colon);
+      }
+
+      const bracket = document.createElement('span');
+      bracket.className = 'tree-bracket';
+      bracket.textContent = openBracket;
+      line.appendChild(bracket);
+
+      const size = document.createElement('span');
+      size.className = 'tree-size';
+      size.textContent = len + (isArray ? ' items' : ' keys');
+      line.appendChild(size);
+
+      div.appendChild(line);
+
+      // Children
+      const children = document.createElement('div');
+      children.className = 'tree-children';
+
+      if (isArray) {
+        value.forEach((item, i) => {
+          children.appendChild(buildNode(i, item, depth + 1, i === value.length - 1));
+        });
+      } else {
+        const keys = Object.keys(value);
+        keys.forEach((k, i) => {
+          children.appendChild(buildNode(k, value[k], depth + 1, i === keys.length - 1));
+        });
+      }
+
+      div.appendChild(children);
+
+      // Close bracket
+      const closeLine = document.createElement('div');
+      closeLine.className = 'tree-line';
+      const spacer = document.createElement('span');
+      spacer.style.width = '16px';
+      spacer.style.display = 'inline-block';
+      closeLine.appendChild(spacer);
+      const cb = document.createElement('span');
+      cb.className = 'tree-bracket';
+      cb.textContent = closeBracket + (isLast ? '' : ',');
+      closeLine.appendChild(cb);
+      div.appendChild(closeLine);
+
+      // Toggle
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('collapsed');
+        children.classList.toggle('collapsed');
+        toggle.textContent = children.classList.contains('collapsed') ? '▶' : '▼';
+        // Show/hide close bracket and size
+        size.style.display = children.classList.contains('collapsed') ? 'none' : '';
+        closeLine.style.display = children.classList.contains('collapsed') ? 'none' : '';
+        // Inline preview when collapsed
+        if (children.classList.contains('collapsed')) {
+          bracket.textContent = openBracket + '...' + closeBracket + (isLast ? '' : ',');
+        } else {
+          bracket.textContent = openBracket;
+        }
+      });
+
+      // Auto-collapse deep levels
+      if (depth >= 3) {
+        toggle.click();
+      }
+    } else {
+      // Primitive
+      const line = document.createElement('div');
+      line.className = 'tree-line';
+
+      const spacer = document.createElement('span');
+      spacer.style.width = '16px';
+      spacer.style.display = 'inline-block';
+      line.appendChild(spacer);
+
+      if (key !== null) {
+        const k = document.createElement('span');
+        k.className = 'tree-key';
+        k.textContent = typeof key === 'number' ? key : '"' + key + '"';
+        line.appendChild(k);
+        const colon = document.createElement('span');
+        colon.className = 'tree-colon';
+        colon.textContent = ': ';
+        line.appendChild(colon);
+      }
+
+      const val = document.createElement('span');
+      if (value === null) {
+        val.className = 'tree-null';
+        val.textContent = 'null';
+      } else if (typeof value === 'string') {
+        val.className = 'tree-string';
+        val.textContent = '"' + value + '"';
+      } else if (typeof value === 'number') {
+        val.className = 'tree-number';
+        val.textContent = value;
+      } else if (typeof value === 'boolean') {
+        val.className = 'tree-bool';
+        val.textContent = value;
+      }
+      line.appendChild(val);
+
+      if (!isLast) {
+        const comma = document.createElement('span');
+        comma.className = 'tree-bracket';
+        comma.textContent = ',';
+        line.appendChild(comma);
+      }
+
+      div.appendChild(line);
+    }
+
+    return div;
+  }
+
+  // Format
+  $('btn-format').addEventListener('click', () => {
+    const val = textarea.value.trim();
+    if (!val) return;
+    let input = val;
+    try {
+      const parsed = JSON.parse(input);
+      textarea.value = JSON.stringify(parsed, null, 2);
+      updateHighlight();
+      hideError();
+    } catch(e) {
+      showError('无法格式化: ' + e.message);
+    }
+  });
+
+  // Compress
+  $('btn-compress').addEventListener('click', () => {
+    const val = textarea.value.trim();
+    if (!val) return;
+    try {
+      const parsed = JSON.parse(val);
+      textarea.value = JSON.stringify(parsed);
+      updateHighlight();
+      hideError();
+    } catch(e) {
+      showError('无法压缩: ' + e.message);
+    }
+  });
+
+  // Smart fix: extract JSON from mixed content, fix Python style, fix quotes
+  $('btn-smart').addEventListener('click', () => {
+    const val = textarea.value;
+    if (!val.trim()) return;
+
+    // Step 1: Try to parse as-is first
+    try {
+      JSON.parse(val.trim());
+      // Already valid JSON, just format it
+      textarea.value = JSON.stringify(JSON.parse(val.trim()), null, 2);
+      updateHighlight();
+      showToast('JSON 格式正确，已格式化');
+      return;
+    } catch(e) { /* continue with smart fix */ }
+
+    // Step 2: Try to extract JSON from mixed content (find top-level { } or [ ])
+    let extracted = extractJSON(val);
+
+    // Step 3: Fix Python-style values (None, True, False) outside of strings
+    extracted = fixPythonValues(extracted);
+
+    // Step 4: Fix single quotes to double quotes
+    extracted = singleToDoubleQuotes(extracted);
+
+    // Step 5: Try to parse
+    try {
+      const parsed = JSON.parse(extracted);
+      textarea.value = JSON.stringify(parsed, null, 2);
+      updateHighlight();
+      showToast('智能修复成功');
+    } catch(e) {
+      // Still try to show the partially fixed result
+      textarea.value = extracted;
+      updateHighlight();
+      showError('智能修复后仍有语法错误: ' + e.message);
+    }
+  });
+
+  // Extract the first complete JSON object or array from mixed text
+  function extractJSON(str) {
+    // Find the first { or [
+    let start = -1;
+    let bracket = '';
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === '{' || str[i] === '[') {
+        start = i;
+        bracket = str[i];
+        break;
+      }
+    }
+    if (start === -1) return str;
+
+    const open = bracket;
+    const close = bracket === '{' ? '}' : ']';
+    let depth = 0;
+    let inStr = false;
+    let strChar = '';
+    let end = -1;
+
+    for (let i = start; i < str.length; i++) {
+      const ch = str[i];
+      if (inStr) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === strChar) inStr = false;
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        inStr = true;
+        strChar = ch;
+        continue;
+      }
+      if (ch === open) depth++;
+      else if (ch === close) {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+
+    if (end === -1) return str; // No matching close bracket
+    return str.slice(start, end + 1);
+  }
+
+  // Fix Python-style None, True, False outside of strings
+  function fixPythonValues(str) {
+    const result = [];
+    let i = 0;
+    let inStr = false;
+    let strChar = '';
+
+    while (i < str.length) {
+      // Handle strings - skip content inside quotes
+      if (!inStr && (str[i] === '"' || str[i] === "'")) {
+        inStr = true;
+        strChar = str[i];
+        result.push(str[i]);
+        i++;
+        continue;
+      }
+      if (inStr) {
+        if (str[i] === '\\') {
+          result.push(str[i]);
+          i++;
+          if (i < str.length) { result.push(str[i]); i++; }
+          continue;
+        }
+        if (str[i] === strChar) {
+          inStr = false;
+        }
+        result.push(str[i]);
+        i++;
+        continue;
+      }
+
+      // Outside strings: check for None, True, False
+      if (str.startsWith('None', i) && !isIdentChar(str[i - 1]) && !isIdentChar(str[i + 4])) {
+        result.push('null');
+        i += 4;
+      } else if (str.startsWith('True', i) && !isIdentChar(str[i - 1]) && !isIdentChar(str[i + 4])) {
+        result.push('true');
+        i += 4;
+      } else if (str.startsWith('False', i) && !isIdentChar(str[i - 1]) && !isIdentChar(str[i + 5])) {
+        result.push('false');
+        i += 5;
+      } else {
+        result.push(str[i]);
+        i++;
+      }
+    }
+    return result.join('');
+  }
+
+  function isIdentChar(ch) {
+    if (!ch) return false;
+    return /[a-zA-Z0-9_]/.test(ch);
+  }
+
+  // Single to double quotes
+  $('btn-quote').addEventListener('click', () => {
+    const val = textarea.value;
+    if (!val.trim()) return;
+
+    const result = singleToDoubleQuotes(val);
+    textarea.value = result;
+    updateHighlight();
+
+    // Try to parse and give feedback
+    try {
+      JSON.parse(result);
+      showToast('单引号已转为双引号');
+    } catch(e) {
+      showError('转换完成，但 JSON 仍有语法错误: ' + e.message);
+    }
+  });
+
+  function singleToDoubleQuotes(str) {
+    const chars = [];
+    let i = 0;
+    const len = str.length;
+    let inSingle = false;
+    let inDouble = false;
+
+    while (i < len) {
+      const ch = str[i];
+      const next = i + 1 < len ? str[i + 1] : '';
+
+      if (inSingle) {
+        if (ch === '\\' && next === "'") {
+          // Escaped single quote -> just output single quote (no escape needed in double-quoted string)
+          chars.push("'");
+          i += 2;
+        } else if (ch === '\\' && next === '\\') {
+          chars.push('\\\\');
+          i += 2;
+        } else if (ch === '\\') {
+          chars.push(ch);
+          i++;
+        } else if (ch === '"') {
+          // Unescaped double quote inside single-quoted string -> needs escaping
+          chars.push('\\"');
+          i++;
+        } else if (ch === "'") {
+          // End of single-quoted string
+          chars.push('"');
+          inSingle = false;
+          i++;
+        } else {
+          chars.push(ch);
+          i++;
+        }
+      } else if (inDouble) {
+        if (ch === '\\') {
+          chars.push(ch);
+          if (next) {
+            chars.push(next);
+            i += 2;
+          } else {
+            i++;
+          }
+        } else if (ch === '"') {
+          chars.push('"');
+          inDouble = false;
+          i++;
+        } else {
+          chars.push(ch);
+          i++;
+        }
+      } else {
+        // Outside any string
+        if (ch === "'") {
+          chars.push('"');
+          inSingle = true;
+          i++;
+        } else if (ch === '"') {
+          chars.push('"');
+          inDouble = true;
+          i++;
+        } else {
+          chars.push(ch);
+          i++;
+        }
+      }
+    }
+
+    return chars.join('');
+  }
+
+  // Unescape: remove extra escape layer
+  // Handles: "{\"name\": \"test\"}" -> {"name": "test"}
+  // Also handles: \\n -> \n, \\t -> \t, \\\\ -> \\, etc.
+  $('btn-unescape').addEventListener('click', () => {
+    let val = textarea.value.trim();
+    if (!val) return;
+
+    // Case 1: The entire input is a JSON string (wrapped in quotes) containing escaped JSON
+    // e.g., "{\"key\": \"value\"}" or '{"key": "value"}'
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      try {
+        // Try JSON.parse to unescape - this handles standard JSON string escaping
+        const unescaped = JSON.parse(val);
+        if (typeof unescaped === 'string') {
+          textarea.value = unescaped;
+          updateHighlight();
+          showToast('已去除转义');
+          return;
+        }
+      } catch(e) {
+        // Not a valid JSON string, fall through to manual unescape
+      }
+    }
+
+    // Case 2: Manual unescape of common escape sequences in the raw text
+    // e.g., {\\\"name\\\": \\\"test\\\"} or content with \" \\n \\t etc.
+    let result = val;
+    // Iteratively unescape until stable (handles multiple layers)
+    let prev;
+    let maxIter = 5;
+    do {
+      prev = result;
+      result = result
+        .replace(/\\"/g, '"')
+        .replace(/\\'/g, "'")
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\r/g, '\r')
+        .replace(/\\\\/g, '\\');
+    } while (result !== prev && --maxIter > 0);
+
+    textarea.value = result;
+    updateHighlight();
+
+    try {
+      JSON.parse(result);
+      showToast('已去除转义');
+    } catch(e) {
+      showToast('已去除转义');
+    }
+  });
+
+  // Escape: add escape layer (make JSON embeddable as a string)
+  $('btn-escape').addEventListener('click', () => {
+    const val = textarea.value;
+    if (!val.trim()) return;
+
+    // Use JSON.stringify to properly escape the string, which adds outer quotes
+    const escaped = JSON.stringify(val);
+    textarea.value = escaped;
+    updateHighlight();
+    showToast('已添加转义');
+  });
+
+  // Copy
+  $('btn-copy').addEventListener('click', () => {
+    const val = textarea.value;
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => {
+      showToast('已复制到剪贴板');
+    }).catch(() => {
+      // Fallback
+      textarea.select();
+      document.execCommand('copy');
+      showToast('已复制到剪贴板');
+    });
+  });
+
+  // Clear
+  $('btn-clear').addEventListener('click', () => {
+    textarea.value = '';
+    updateHighlight();
+    hideError();
+  });
+
+  // Expand / Collapse all
+  $('btn-expand').addEventListener('click', () => {
+    treeContainer.querySelectorAll('.tree-toggle.collapsed').forEach(t => t.click());
+  });
+
+  $('btn-collapse').addEventListener('click', () => {
+    treeContainer.querySelectorAll('.tree-toggle:not(.collapsed)').forEach(t => t.click());
+  });
+
+  // Click error position to jump cursor to error location
+  errorPos.addEventListener('click', () => {
+    if (currentErrorPos >= 0) {
+      textarea.focus();
+      textarea.setSelectionRange(currentErrorPos, currentErrorPos + 1);
+      // Scroll textarea to cursor position
+      // Create a temporary span to measure position - use built-in scrolling
+      const lineHeight = 20.8; // 13px * 1.6
+      const { line } = lineColFromPos(textarea.value, currentErrorPos);
+      textarea.scrollTop = Math.max(0, line * lineHeight - textarea.clientHeight / 2);
+      pre.scrollTop = textarea.scrollTop;
+    }
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.shiftKey && e.key === 'f') {
+      e.preventDefault();
+      $('btn-format').click();
+    } else if (mod && e.shiftKey && e.key === 'm') {
+      e.preventDefault();
+      $('btn-compress').click();
+    }
+  });
+
+  // Init
+  updateHighlight();
+})();
+</script>
+
+</body>
+</html>
